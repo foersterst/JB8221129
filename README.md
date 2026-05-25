@@ -18,7 +18,7 @@ This repository accompanies the article Broad-scale climatic gradients drive mul
 - `data/results.xlsx` beta-diversity and proportion of beta-diversity components (used for plotting only).
 - `shp/` shapefiles used for plotting.
 
-**Data usage notice**
+### Data usage notice
 
 The code in this repository is released under the MIT License. However, the data files are **not** covered by the MIT License.
 
