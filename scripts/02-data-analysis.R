@@ -1,0 +1,193 @@
+# R Script: Broad-scale climatic gradients drive multiple facets of scorpion beta diversity in northeastern Brazil
+# Stenio I A Foerster
+# https://foersterst.github.io/
+# May 25, 2026
+
+
+# Libraries & Data ----------------------------------------------------------------------------
+
+library(tidyverse)
+library(BAT)
+library(vegan)
+library(adespatial)
+library(ggsci)
+library(patchwork)
+library(ape)
+library(sf)
+library(ggtree)
+library(deeptime)
+
+# custom function to calculate beta diversity, variation partitioning, and permutation tests
+source("scripts/fit_beta_div.R")
+
+# read in community data
+comm <- readxl::read_excel("data/scorp-comm.xlsx", sheet = 1, skip = 1)
+
+# raw community matrix
+sco_raw <- comm[, colnames(comm)[grepl("_", colnames(comm))]]
+
+# read in traits
+traits <- read.csv("data/scorp-traits.csv", header = T, row.names = 1, stringsAsFactors = T)
+
+# this must be TRUE
+identical(rownames(traits), colnames(sco_raw))
+
+# get a functional distance matrix and a functional tree (for FD)
+func_dist <- cluster::daisy(traits, metric = "gower")
+func_tree <- hclust(func_dist, method = "average")
+
+# read in the environmental variables
+envs <- read_csv("data/site-envs.csv")
+
+# this must be TRUE
+identical(envs$site, comm$site)
+
+# PCA on environmental variables
+pca_envs <- pca(X = envs[, grepl("bio_", colnames(envs))], scale = T)
+summary(pca_envs) # PC1-3 retains 92%
+envs_scores <- as.data.frame(scores(pca_envs, choices = 1:3)$sites)
+rownames(envs_scores) <- envs$site
+
+# add soil classes to the data frame containing the env scores
+
+# this must be TRUE
+identical(rownames(envs_scores), envs$site)
+envs_scores$soil <- envs$soil
+envs_scores$soil <- as.factor(envs_scores$soil)
+str(envs_scores)
+
+# construct the matrix of dbMEMs  with positive spatial correlation
+sco_mems <- as_tibble(dbmem(envs[, c("lon", "lat")], silent = F, MEM.autocor = "positive", thresh = NULL)) # Truncation level = 1.579837
+
+# read in the phylogeny
+phy <- read.tree("data/scorp-pruned-tree.tre")
+
+# match data and tree
+traits <- traits[match(phy$tip.label, rownames(traits)), ]
+sco_raw <- sco_raw[, phy$tip.label]
+
+# this must be TRUE
+identical(phy$tip.label, rownames(traits))
+
+# Beta Diversity ------------------------------------------------------------------------------
+
+## Taxonomic ----
+beta_tax_total <- fit_beta_div(comm = sco_raw, envs = envs_scores, mems = sco_mems, response = "total") # total beta
+beta_tax_repl <- fit_beta_div(comm = sco_raw, envs = envs_scores, mems = sco_mems, response = "repl") # replacement component
+
+## Phylogenetic ----
+beta_phy_total <- fit_beta_div(comm = sco_raw, envs = envs_scores, mems = sco_mems, tree = phy, response = "total") # total beta
+beta_phy_repl <- fit_beta_div(comm = sco_raw, envs = envs_scores, mems = sco_mems, tree = phy, response = "repl") # replacement component
+
+## Functional ----
+beta_fun_total <- fit_beta_div(comm = sco_raw, envs = envs_scores, mems = sco_mems, tree = func_tree, response = "total") # total beta
+beta_fun_repl <- fit_beta_div(comm = sco_raw, envs = envs_scores, mems = sco_mems, tree = func_tree, response = "repl") # replacement component
+
+
+# Graphs --------------------------------------------------------------------------------------
+
+# read file with results
+# NB: this file was created manually, based on the results generated above
+res_data <- readxl::read_excel("data/results.xlsx", sheet = 1)
+res_data$value <- res_data$Proportion * res_data$mean_BD
+
+## Bar plot ----
+
+ggplot(res_data, aes(x = Facet, y = value, fill = Component)) +
+  geom_col(width = 0.4) +
+  geom_text(
+    aes(label = sprintf("%.2f", Proportion)),
+    position = position_stack(vjust = 0.5),
+    size = 3,
+    color = "white"
+  ) +
+  coord_flip() +
+  labs(
+    x = expression(beta ~ "diversity facet"),
+    y = expression("Total" ~ beta ~ "diversity")
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title = element_text(color = "black", size = 10),
+    axis.text = element_text(color = "black"),
+    legend.title = element_blank(),
+    legend.position = "top",
+    legend.key.height = unit(4, "mm"),
+    legend.key.width = unit(5, "mm"),
+    panel.grid = element_line(linewidth = 0.3)
+  ) +
+  scale_fill_brewer(palette = "Accent", labels = c("Replacement", "Richness difference"))
+
+
+## MEMs ----
+
+# forces planar geometry ops
+sf_use_s2(FALSE)
+
+# shapefile (already cropped and in the right projection)
+biomes <- st_read("data/shp/biomes_crop.shp")
+
+# sites (and dbMEMs)
+pts_df <- bind_rows(
+  tibble(dbMEM = "MEM1", lon = envs$lon, lat = envs$lat, val = sco_mems$MEM1),
+  tibble(dbMEM = "MEM2", lon = envs$lon, lat = envs$lat, val = sco_mems$MEM2),
+  tibble(dbMEM = "MEM3", lon = envs$lon, lat = envs$lat, val = sco_mems$MEM3),
+  tibble(dbMEM = "MEM13", lon = envs$lon, lat = envs$lat, val = sco_mems$MEM13)
+)
+
+# spatial points
+pts <- st_as_sf(pts_df, coords = c("lon", "lat"), crs = 4326)
+pts$dbMEM <- factor(pts$dbMEM, levels = c("MEM1", "MEM2", "MEM3", "MEM13"))
+pts <- rename(pts, "Eigenvalue" = val)
+
+# bb
+bb <- st_bbox(pts)
+pad <- 0.2
+bb[c("xmin", "ymin", "xmax", "ymax")] <- bb[c("xmin", "ymin", "xmax", "ymax")] + c(-pad, -pad, pad, pad)
+
+# graph
+ggplot() +
+  geom_sf(data = biomes, fill = "grey90", color = "grey40", alpha = 0.6) +
+  geom_sf(data = pts, aes(color = Eigenvalue), size = 1.8, alpha = 0.5) +
+  facet_wrap(~dbMEM) +
+  coord_sf(
+    xlim = c(bb["xmin"], bb["xmax"]),
+    ylim = c(bb["ymin"], bb["ymax"]),
+    expand = F
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid = element_line(linewidth = 0.25),
+    legend.position = "bottom",
+    legend.key.height = unit(4, "mm"),
+    panel.border = element_rect(linewidth = 0.25),
+    axis.text = element_text(size = 8, color = "black"),
+    strip.text = element_text(color = "black"),
+    axis.ticks = element_line(linewidth = 0.2, color = "black"),
+    axis.ticks.length = unit(-1.3, "mm"),
+    legend.title = element_text(size = 9)
+  ) +
+  scale_x_continuous(breaks = scales::pretty_breaks(4)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(4)) +
+  scale_color_viridis_c(option = "turbo")
+
+
+## Phylogeny ----
+
+# read in the phylogeny
+phy1 <- read.tree("data/scorp-pruned-tree.tre")
+
+# adjust tip labels
+phy1$tip.label <- gsub("BOTH_|BUTH_", "", phy1$tip.label)
+phy1$tip.label <- gsub("_", " ", phy1$tip.label)
+phy1$tip.label <- gsub("Ananteris sp caetes", "Ananteris sp.", phy1$tip.label)
+
+# plot the tree
+ggtree(tr = phy1, linewidth = 0.5) |>
+  revts() +
+  geom_tiplab(size = 2.5, offset = 5) +
+  coord_geo(xlim = c(-355, 20), ylim = c(0, Ntip(phy1) + 0.3), neg = TRUE, abbrv = TRUE, alpha = 0.5, height = unit(6, "mm"), size = 3) +
+  scale_x_continuous(breaks = seq(-345, 0, 60), labels = abs(seq(-345, 0, 60))) +
+  theme_tree2()
+
+# END
