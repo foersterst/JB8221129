@@ -1,6 +1,8 @@
 # Broad-scale climatic gradients drive multiple facets of scorpion beta diversity in northeastern Brazil
 
-This repository accompanies the article Broad-scale climatic gradients drive multiple facets of scorpion beta diversity in northeastern Brazil, published on *Journal of Biogeography*.
+Please make sure to cite the following paper if you use any data from this repository:
+
+Foerster, S. Í. A., & Lira, A. F. A. (2026). Broad-Scale Climatic Gradients Drive Multiple Facets of Scorpion Beta Diversity in Northeastern Brazil. *Journal of Biogeography*, 53(6), e70271. <https://doi.org/10.1111/jbi.70271>
 
 ## File Description
 
@@ -18,10 +20,6 @@ This repository accompanies the article Broad-scale climatic gradients drive mul
 - `data/results.xlsx` beta-diversity and proportion of beta-diversity components (used for plotting only).
 - `shp/` shapefiles used for plotting.
 
-### Data usage notice
+### Contact
 
-The code in this repository is released under the MIT License. However, the data files are **not** covered by the MIT License.
-
-The data are provided for transparency and reproducibility purposes only. Users wishing to reuse, redistribute, or publish analyses based on these data must first obtain permission from the author.
-
-Please contact: stenioit\@gmail.com
+I welcome inquiries and opportunities for future collaboration. Contact details and information about my research are available at [https://foersterst.github.io](https://foersterst.github.io/)
