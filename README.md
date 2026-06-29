@@ -9,7 +9,7 @@ Foerster, S. Í. A., & Lira, A. F. A. (2026). Broad-Scale Climatic Gradients Dri
 ### R Scripts
 
 - `scripts/data-analysis.R` contains the R code to reproduce all results in the manuscript.
-- `scripts/fit-beta-div.R` custom R function that takes a community matrix, site-level environmental variables, spatial descriptors (MEMs), and a tree (phylogenetic or functional) and calculates 1) beta-diversity metrics, including relative contributions of species replacement and richness differences to total beta-diversity, variation partitioning of beta-diversity matrices (e.g., replacement, richness difference) as well MEMs retained by forward selection. Use this function without a tree if you want to calculate taxonomic beta-diversity.
+- `scripts/fit-beta-div.R` custom R function that takes a community matrix, site-level environmental variables, spatial descriptors (MEMs), and an optional phylogenetic or functional tree to calculate beta-diversity metrics. The function quantifies total beta-diversity and its relative components, including species replacement and richness differences, performs variation partitioning on beta-diversity matrices (e.g., replacement and richness difference), and identifies spatial descriptors (MEMs) retained through forward selection. When no tree is provided, the function calculates taxonomic beta-diversity.
 
 ### Data Files
 
